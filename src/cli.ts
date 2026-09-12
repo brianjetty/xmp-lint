@@ -1,0 +1,76 @@
+#!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+import { parseXmp } from './xmp.js';
+import { rules, type Finding } from './rules.js';
+
+interface FileResult {
+  file: string;
+  findings: Finding[];
+  readError?: string;
+}
+
+function lintFile(path: string): FileResult {
+  let content: string;
+  try {
+    content = readFileSync(path, 'utf8');
+  } catch (err) {
+    return { file: path, findings: [], readError: (err as Error).message };
+  }
+  const data = parseXmp(content);
+  const findings = rules.flatMap((rule) => rule(data)).sort((a, b) => a.line - b.line);
+  return { file: path, findings };
+}
+
+function printHuman(results: FileResult[]): boolean {
+  let total = 0;
+  let hasError = false;
+
+  for (const result of results) {
+    if (result.readError) {
+      hasError = true;
+      console.log(`${result.file}: ${result.readError}`);
+      continue;
+    }
+    for (const finding of result.findings) {
+      total++;
+      if (finding.severity === 'error') hasError = true;
+      console.log(`${result.file}:${finding.line}: ${finding.severity} [${finding.ruleId}] ${finding.message}`);
+    }
+  }
+
+  if (total === 0 && !hasError) {
+    console.log('no findings');
+  } else {
+    console.log(`\n${total} finding${total === 1 ? '' : 's'} in ${results.length} file${results.length === 1 ? '' : 's'}`);
+  }
+  return hasError;
+}
+
+function printJson(results: FileResult[]): boolean {
+  const flat = results.flatMap((result) => {
+    if (result.readError) {
+      return [{ file: result.file, ruleId: 'read-error', severity: 'error', message: result.readError, line: 0 }];
+    }
+    return result.findings.map((finding) => ({ file: result.file, ...finding }));
+  });
+  console.log(JSON.stringify(flat, null, 2));
+  return flat.some((f) => f.severity === 'error');
+}
+
+function main(): void {
+  const args = process.argv.slice(2);
+  const jsonMode = args.includes('--json');
+  const files = args.filter((arg) => arg !== '--json');
+
+  if (files.length === 0) {
+    console.error('usage: xmp-lint [--json] <file.xmp> [more files...]');
+    process.exitCode = 2;
+    return;
+  }
+
+  const results = files.map(lintFile);
+  const hasError = jsonMode ? printJson(results) : printHuman(results);
+  if (hasError) process.exitCode = 1;
+}
+
+main();

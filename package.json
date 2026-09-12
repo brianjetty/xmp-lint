@@ -1,0 +1,17 @@
+{
+  "name": "xmp-lint",
+  "version": "0.1.0",
+  "description": "Lints XMP sidecar files for missing attribution, leaked GPS data, and malformed dates.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "xmp-lint": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/cli.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
