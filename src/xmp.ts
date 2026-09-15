@@ -9,6 +9,19 @@ export interface XmpField {
   line: number;
 }
 
+// One <rdf:li xml:lang="..."> entry inside an rdf:Alt language-alternative
+// block. Lightroom writes these for dc:title, dc:description, and dc:rights
+// even when there's only ever one language in practice.
+export interface AltEntry {
+  lang: string;
+  value: string;
+  line: number;
+}
+
+// Tags that use the rdf:Alt language-alternative shape and are worth
+// checking for empty or duplicated entries.
+const ALT_TAGS = ['dc:title', 'dc:description', 'dc:rights'];
+
 export interface XmpData {
   gpsLatitude?: XmpField;
   gpsLongitude?: XmpField;
@@ -16,6 +29,7 @@ export interface XmpData {
   rights?: XmpField;
   credit?: XmpField;
   description?: XmpField;
+  alts: Record<string, AltEntry[]>;
 }
 
 function lineAt(content: string, index: number): number {
@@ -52,7 +66,40 @@ function findElementText(content: string, tag: string): XmpField | undefined {
   return undefined;
 }
 
+// Collects every rdf:li entry inside a tag's rdf:Alt block, e.g.
+// <dc:title><rdf:Alt><rdf:li xml:lang="x-default">A</rdf:li></rdf:Alt></dc:title>.
+// Fields written as plain `<tag>text</tag>` (no rdf:Alt) have nothing to
+// compare against each other, so they yield no entries.
+function findElementAlts(content: string, tag: string): AltEntry[] {
+  const block = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`).exec(content);
+  if (!block) return [];
+
+  const altBlock = /<rdf:Alt>([\s\S]*?)<\/rdf:Alt>/.exec(block[1]);
+  if (!altBlock) return [];
+
+  const tagInnerStart = block.index + block[0].indexOf(block[1]);
+  const altInnerStart = tagInnerStart + altBlock.index + altBlock[0].indexOf(altBlock[1]);
+
+  const entries: AltEntry[] = [];
+  const liRegex = /<rdf:li([^>]*)>([^<]*)<\/rdf:li>/g;
+  let li: RegExpExecArray | null;
+  while ((li = liRegex.exec(altBlock[1]))) {
+    const langMatch = /xml:lang\s*=\s*"([^"]*)"/.exec(li[1]);
+    entries.push({
+      lang: langMatch ? langMatch[1] : 'x-default',
+      value: li[2].trim(),
+      line: lineAt(content, altInnerStart + li.index),
+    });
+  }
+  return entries;
+}
+
 export function parseXmp(content: string): XmpData {
+  const alts: Record<string, AltEntry[]> = {};
+  for (const tag of ALT_TAGS) {
+    alts[tag] = findElementAlts(content, tag);
+  }
+
   return {
     gpsLatitude: findAttr(content, 'exif:GPSLatitude'),
     gpsLongitude: findAttr(content, 'exif:GPSLongitude'),
@@ -60,5 +107,6 @@ export function parseXmp(content: string): XmpData {
     rights: findElementText(content, 'dc:rights'),
     credit: findAttr(content, 'photoshop:Credit') ?? findElementText(content, 'photoshop:Credit'),
     description: findElementText(content, 'dc:description'),
+    alts,
   };
 }

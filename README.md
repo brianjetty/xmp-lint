@@ -20,9 +20,14 @@ you which line to look at.
 - `invalid-date` - `exif:DateTimeOriginal` doesn't match a recognizable
   timestamp format.
 - `oversized-description` - `dc:description` is longer than 500 characters.
+- `empty-language-alt` - `dc:title`, `dc:description`, or `dc:rights` has an
+  `rdf:Alt` entry with no text for one of its languages.
+- `duplicate-language-alt` - the same field has two `rdf:Alt` entries with
+  identical text under different languages, which usually means a batch tool
+  copied one language into another instead of leaving it untranslated.
 
-More rules belong here over time (keyword hygiene, orientation sanity,
-duplicate language alternatives). See the roadmap below.
+More rules belong here over time (keyword hygiene, orientation sanity). See
+the roadmap below.
 
 ## Usage
 

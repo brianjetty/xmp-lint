@@ -1,4 +1,4 @@
-import type { XmpData } from './xmp.js';
+import type { AltEntry, XmpData } from './xmp.js';
 
 export type Severity = 'error' | 'warning' | 'info';
 
@@ -69,4 +69,40 @@ function oversizedDescription(data: XmpData): Finding[] {
   ];
 }
 
-export const rules: Rule[] = [missingAttribution, gpsPresent, invalidDate, oversizedDescription];
+function languageAltHygiene(data: XmpData): Finding[] {
+  const findings: Finding[] = [];
+  for (const [tag, entries] of Object.entries(data.alts)) {
+    const seen = new Map<string, AltEntry>();
+    for (const entry of entries) {
+      if (!entry.value) {
+        findings.push({
+          ruleId: 'empty-language-alt',
+          severity: 'warning',
+          message: `${tag} has an empty rdf:Alt entry for language "${entry.lang}".`,
+          line: entry.line,
+        });
+        continue;
+      }
+      const existing = seen.get(entry.value);
+      if (existing) {
+        findings.push({
+          ruleId: 'duplicate-language-alt',
+          severity: 'info',
+          message: `${tag} repeats the same text for "${existing.lang}" and "${entry.lang}"; rdf:Alt is meant to hold a distinct version per language.`,
+          line: entry.line,
+        });
+      } else {
+        seen.set(entry.value, entry);
+      }
+    }
+  }
+  return findings;
+}
+
+export const rules: Rule[] = [
+  missingAttribution,
+  gpsPresent,
+  invalidDate,
+  oversizedDescription,
+  languageAltHygiene,
+];
