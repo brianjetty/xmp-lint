@@ -22,6 +22,13 @@ export interface AltEntry {
 // checking for empty or duplicated entries.
 const ALT_TAGS = ['dc:title', 'dc:description', 'dc:rights'];
 
+// One <rdf:li> entry inside dc:subject's rdf:Bag (Lightroom) or rdf:Seq
+// (some other tools preserve keyword order instead of treating it as a set).
+export interface KeywordEntry {
+  value: string;
+  line: number;
+}
+
 export interface XmpData {
   gpsLatitude?: XmpField;
   gpsLongitude?: XmpField;
@@ -30,6 +37,7 @@ export interface XmpData {
   credit?: XmpField;
   description?: XmpField;
   alts: Record<string, AltEntry[]>;
+  keywords: KeywordEntry[];
 }
 
 function lineAt(content: string, index: number): number {
@@ -94,6 +102,28 @@ function findElementAlts(content: string, tag: string): AltEntry[] {
   return entries;
 }
 
+// dc:subject holds keywords as an unordered rdf:Bag (occasionally rdf:Seq)
+// of plain rdf:li text, unlike the rdf:Alt fields above there's no
+// xml:lang to key off of - just the list of entries in document order.
+function findKeywords(content: string, tag: string): KeywordEntry[] {
+  const block = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`).exec(content);
+  if (!block) return [];
+
+  const listBlock = /<rdf:(?:Bag|Seq)>([\s\S]*?)<\/rdf:(?:Bag|Seq)>/.exec(block[1]);
+  if (!listBlock) return [];
+
+  const tagInnerStart = block.index + block[0].indexOf(block[1]);
+  const listInnerStart = tagInnerStart + listBlock.index + listBlock[0].indexOf(listBlock[1]);
+
+  const entries: KeywordEntry[] = [];
+  const liRegex = /<rdf:li[^>]*>([^<]*)<\/rdf:li>/g;
+  let li: RegExpExecArray | null;
+  while ((li = liRegex.exec(listBlock[1]))) {
+    entries.push({ value: li[1].trim(), line: lineAt(content, listInnerStart + li.index) });
+  }
+  return entries;
+}
+
 export function parseXmp(content: string): XmpData {
   const alts: Record<string, AltEntry[]> = {};
   for (const tag of ALT_TAGS) {
@@ -108,5 +138,6 @@ export function parseXmp(content: string): XmpData {
     credit: findAttr(content, 'photoshop:Credit') ?? findElementText(content, 'photoshop:Credit'),
     description: findElementText(content, 'dc:description'),
     alts,
+    keywords: findKeywords(content, 'dc:subject'),
   };
 }

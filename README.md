@@ -25,9 +25,13 @@ you which line to look at.
 - `duplicate-language-alt` - the same field has two `rdf:Alt` entries with
   identical text under different languages, which usually means a batch tool
   copied one language into another instead of leaving it untranslated.
+- `empty-keyword` - `dc:subject` has an `rdf:li` entry with no text.
+- `duplicate-keyword` - `dc:subject` has the same keyword twice (case
+  insensitive), which is usually a batch-tagging tool re-adding a keyword
+  under different capitalization instead of recognizing it already applies.
 
-More rules belong here over time (keyword hygiene, orientation sanity). See
-the roadmap below.
+More rules belong here over time (orientation sanity, lens/camera sanity
+checks). See the roadmap below.
 
 ## Usage
 

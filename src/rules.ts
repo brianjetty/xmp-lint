@@ -99,10 +99,40 @@ function languageAltHygiene(data: XmpData): Finding[] {
   return findings;
 }
 
+function keywordHygiene(data: XmpData): Finding[] {
+  const findings: Finding[] = [];
+  const seen = new Map<string, string>();
+  for (const entry of data.keywords) {
+    if (!entry.value) {
+      findings.push({
+        ruleId: 'empty-keyword',
+        severity: 'warning',
+        message: 'dc:subject has an empty keyword entry.',
+        line: entry.line,
+      });
+      continue;
+    }
+    const key = entry.value.toLowerCase();
+    const existing = seen.get(key);
+    if (existing) {
+      findings.push({
+        ruleId: 'duplicate-keyword',
+        severity: 'info',
+        message: `dc:subject repeats "${existing}" as "${entry.value}"; batch tools sometimes add a keyword twice with different casing.`,
+        line: entry.line,
+      });
+    } else {
+      seen.set(key, entry.value);
+    }
+  }
+  return findings;
+}
+
 export const rules: Rule[] = [
   missingAttribution,
   gpsPresent,
   invalidDate,
   oversizedDescription,
   languageAltHygiene,
+  keywordHygiene,
 ];
