@@ -48,6 +48,13 @@ Then run it against one or more sidecar files:
 node dist/cli.js photos/2026-08-14/_DSC0142.xmp
 ```
 
+It also reads JPEGs directly, pulling the XMP packet out of the file's APP1
+segment instead of requiring a sidecar:
+
+```
+node dist/cli.js photos/2026-08-14/_DSC0142.jpg
+```
+
 ```
 photos/2026-08-14/_DSC0142.xmp:9: info [gps-present] GPS latitude embedded (37,46.5432N); strip it before publishing if the location shouldn't be public.
 photos/2026-08-14/_DSC0142.xmp:1: warning [missing-attribution] no dc:rights or photoshop:Credit found; the file carries no attribution.
@@ -84,6 +91,12 @@ were given, and `0` otherwise - so `--json` output is safe to pipe into
 This reads the common shape of XMP that Lightroom and `exiftool -X` produce:
 EXIF fields as attributes on `rdf:Description`, and Dublin Core / Photoshop
 fields as either attributes or `rdf:Alt`/`rdf:li` text elements. It is not a
-general-purpose XML or RDF parser, and it does not read metadata embedded
-directly in JPEG/TIFF/RAW binaries - only sidecar files. Widening that scope
-is on the roadmap.
+general-purpose XML or RDF parser.
+
+Besides `.xmp` sidecars, it reads the XMP packet embedded in a JPEG's APP1
+segment directly - no sidecar needed. A JPEG with no embedded packet at all
+is reported as a skip, not an error. TIFF and RAW files (which store the
+packet differently, inside a TIFF IFD tag rather than a length-prefixed
+marker segment) aren't read yet; that's still on the roadmap, along with a
+config file for tuning which rules run, a fixture-based test suite, and a
+`--fix` mode for safe auto-fixes like stripping GPS.
